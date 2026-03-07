@@ -36,8 +36,22 @@ class RankingSystem {
     this.confidence[clean] = this.newConf();
 
     for (const dim of DIMS) {
-      if (!this.rankings[dim].length) this.rankings[dim] = [[clean]];
-      else await this.insertNodeRanked(clean, dim, askFn);
+      if (!this.rankings[dim].length) {
+        this.rankings[dim] = [[clean]];
+      } else {
+        const ok = await this.insertNodeRanked(clean, dim, askFn);
+        if (!ok) {
+          delete this.nodes[clean];
+          delete this.confidence[clean];
+          for (const d of DIMS) {
+            this.rankings[d] = this.rankings[d]
+              .map(group => group.filter(n => n !== clean))
+              .filter(group => group.length);
+          }
+          this.rebalance();
+          return false;
+        }
+      }
     }
     this.rebalance();
     return true;
@@ -50,7 +64,7 @@ class RankingSystem {
       const mid = Math.floor((low + high) / 2);
       const compareTo = ranking[mid][0];
       const r = await askFn(`For ${dim}, is ${name} better than ${compareTo}?`, ["Yes", "No", "Equal / Skip"]);
-      if (!r) return;
+      if (!r) return false;
       if (r === "Yes") {
         this.recordComparison(name, compareTo, [dim], false);
         high = mid;
@@ -60,10 +74,11 @@ class RankingSystem {
       } else {
         this.recordComparison(name, compareTo, [dim], false);
         ranking[mid].push(name);
-        return;
+        return true;
       }
     }
     ranking.splice(low, 0, [name]);
+    return true;
   }
 
   moveWinnerAboveLoser(winner, loser, dims = DIMS, markPair = false) {
@@ -520,8 +535,15 @@ function importCsvRows(rows) {
 document.getElementById("addBtn").addEventListener("click", async () => {
   const name = prompt("Enter person name:");
   if (!name) return;
-  pushUndo("add");
-  await state.sys.addNode(name, (question, options) => askChoice(question, "", options));
+  const snapshot = JSON.stringify(state.sys.toJSON());
+  const created = await state.sys.addNode(name, (question, options) => askChoice(question, "", options));
+  if (!created) {
+    render();
+    return;
+  }
+  state.undo.push({ reason: "add", snapshot });
+  if (state.undo.length > state.maxUndo) state.undo.shift();
+  state.redo = [];
   saveLocal(); render();
 });
 
