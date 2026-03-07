@@ -1,6 +1,6 @@
 const DIMS = ["Appearance", "Personality", "Compatibility"];
 const DEFAULT_WEIGHTS = { Appearance: 0.25, Personality: 0.25, Compatibility: 0.5 };
-const BUILD_VERSION = "2026-03-06-9";
+const BUILD_VERSION = "2026-03-06-10";
 
 class RankingSystem {
   constructor() {
@@ -281,19 +281,12 @@ const el = {
   conf: document.getElementById("confRange"),
   confValue: document.getElementById("confValue"),
   theme: document.getElementById("themeSelect"),
-  choiceDialog: document.getElementById("choiceDialog"),
+  choiceModal: document.getElementById("choiceModal"),
   choiceTitle: document.getElementById("choiceTitle"),
   choiceSubtitle: document.getElementById("choiceSubtitle"),
   choiceButtons: document.getElementById("choiceButtons"),
   buildTag: document.getElementById("buildTag"),
 };
-if (el.choiceDialog) {
-  // Prevent accidental dismissal on mobile (outside tap / ESC style cancel).
-  el.choiceDialog.addEventListener("cancel", (e) => e.preventDefault());
-  el.choiceDialog.addEventListener("click", (e) => {
-    if (e.target === el.choiceDialog) e.preventDefault();
-  });
-}
 
 function setStatus(msg) { el.status.textContent = msg; }
 function pushUndo(reason) {
@@ -397,6 +390,7 @@ function askChoice(title, subtitle = "", options = [], cancelLabel = "Cancel") {
     const finish = (value) => {
       if (resolved) return;
       resolved = true;
+      el.choiceModal.classList.add("hidden");
       resolve(value);
     };
 
@@ -406,7 +400,6 @@ function askChoice(title, subtitle = "", options = [], cancelLabel = "Cancel") {
       b.textContent = opt;
       b.addEventListener("click", () => {
         finish(opt);
-        el.choiceDialog.close();
       });
       el.choiceButtons.appendChild(b);
     });
@@ -418,13 +411,11 @@ function askChoice(title, subtitle = "", options = [], cancelLabel = "Cancel") {
       cancel.textContent = cancelLabel;
       cancel.addEventListener("click", () => {
         finish(null);
-        el.choiceDialog.close();
       });
       el.choiceButtons.appendChild(cancel);
     }
 
-    el.choiceDialog.onclose = () => finish(null);
-    el.choiceDialog.showModal();
+    el.choiceModal.classList.remove("hidden");
   });
 }
 
