@@ -1,5 +1,6 @@
 const DIMS = ["Appearance", "Personality", "Compatibility"];
 const DEFAULT_WEIGHTS = { Appearance: 0.25, Personality: 0.25, Compatibility: 0.5 };
+const BUILD_VERSION = "2026-03-06-3";
 
 class RankingSystem {
   constructor() {
@@ -258,6 +259,7 @@ const el = {
   choiceTitle: document.getElementById("choiceTitle"),
   choiceSubtitle: document.getElementById("choiceSubtitle"),
   choiceButtons: document.getElementById("choiceButtons"),
+  buildTag: document.getElementById("buildTag"),
 };
 
 function setStatus(msg) { el.status.textContent = msg; }
@@ -620,7 +622,16 @@ el.theme.addEventListener("change", () => {
 
 loadLocal();
 render();
+if (el.buildTag) el.buildTag.textContent = `Build ${BUILD_VERSION}`;
 
 if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js"));
+  window.addEventListener("load", async () => {
+    try {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    } catch {}
+    try {
+      await navigator.serviceWorker.register(`./sw.js?v=${BUILD_VERSION}`, { scope: "./" });
+    } catch {}
+  });
 }
