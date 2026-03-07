@@ -1,6 +1,6 @@
 const DIMS = ["Appearance", "Personality", "Compatibility"];
 const DEFAULT_WEIGHTS = { Appearance: 0.25, Personality: 0.25, Compatibility: 0.5 };
-const BUILD_VERSION = "2026-03-06-7";
+const BUILD_VERSION = "2026-03-06-8";
 
 class RankingSystem {
   constructor() {
@@ -64,20 +64,23 @@ class RankingSystem {
       const mid = Math.floor((low + high) / 2);
       const compareTo = ranking[mid][0];
       const r = await askFn(`For ${dim}, is ${name} better than ${compareTo}?`, ["Yes", "No", "Equal / Skip"]);
-      if (!r) return false;
-      if (r === "Yes") {
+      if (r === null || r === undefined) return false;
+      const choice = String(r).trim().toLowerCase();
+      if (choice === "yes" || choice === "y") {
         this.recordComparison(name, compareTo, [dim], false);
         high = mid;
-      } else if (r === "No") {
+      } else if (choice === "no" || choice === "n") {
         this.recordComparison(name, compareTo, [dim], false);
         low = mid + 1;
-      } else if (r === "Equal / Skip") {
+      } else if (choice === "equal / skip" || choice === "equal/skip" || choice === "equal" || choice === "skip") {
         this.recordComparison(name, compareTo, [dim], false);
         ranking[mid].push(name);
         return true;
       } else {
-        // Any unknown response is treated as cancel/abort.
-        return false;
+        // Unknown string values should not abort add flow; treat as equal.
+        this.recordComparison(name, compareTo, [dim], false);
+        ranking[mid].push(name);
+        return true;
       }
     }
     ranking.splice(low, 0, [name]);
@@ -279,6 +282,13 @@ const el = {
   choiceButtons: document.getElementById("choiceButtons"),
   buildTag: document.getElementById("buildTag"),
 };
+if (el.choiceDialog) {
+  // Prevent accidental dismissal on mobile (outside tap / ESC style cancel).
+  el.choiceDialog.addEventListener("cancel", (e) => e.preventDefault());
+  el.choiceDialog.addEventListener("click", (e) => {
+    if (e.target === el.choiceDialog) e.preventDefault();
+  });
+}
 
 function setStatus(msg) { el.status.textContent = msg; }
 function pushUndo(reason) {
