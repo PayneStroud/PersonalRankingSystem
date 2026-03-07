@@ -1,6 +1,6 @@
 const DIMS = ["Appearance", "Personality", "Compatibility"];
 const DEFAULT_WEIGHTS = { Appearance: 0.25, Personality: 0.25, Compatibility: 0.5 };
-const BUILD_VERSION = "2026-03-06-4";
+const BUILD_VERSION = "2026-03-06-5";
 
 class RankingSystem {
   constructor() {
@@ -71,10 +71,13 @@ class RankingSystem {
       } else if (r === "No") {
         this.recordComparison(name, compareTo, [dim], false);
         low = mid + 1;
-      } else {
+      } else if (r === "Equal / Skip") {
         this.recordComparison(name, compareTo, [dim], false);
         ranking[mid].push(name);
         return true;
+      } else {
+        // Any unknown response is treated as cancel/abort.
+        return false;
       }
     }
     ranking.splice(low, 0, [name]);
@@ -538,7 +541,7 @@ document.getElementById("addBtn").addEventListener("click", async () => {
   const snapshot = JSON.stringify(state.sys.toJSON());
   const created = await state.sys.addNode(name, (question, options) => askChoice(question, "", options));
   if (!created) {
-    render();
+    applySnapshot(snapshot);
     return;
   }
   state.undo.push({ reason: "add", snapshot });
