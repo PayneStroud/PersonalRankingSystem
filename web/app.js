@@ -170,11 +170,71 @@ class RankingSystem {
   }
 
   fromJSON(data) {
-    this.nodes = data.nodes || {};
-    this.rankings = data.rankings || { Appearance: [], Personality: [], Compatibility: [] };
-    this.confidence = data.confidence || {};
-    this.comparisons = new Set(data.comparisons || []);
-    this.weights = data.weights || { ...DEFAULT_WEIGHTS };
+    const src = data || {};
+    const names = Object.keys(src.nodes || {});
+
+    this.nodes = {};
+    names.forEach(name => {
+      const raw = src.nodes[name] || {};
+      this.nodes[name] = {
+        Appearance: Number(raw.Appearance ?? 5),
+        Personality: Number(raw.Personality ?? 5),
+        Compatibility: Number(raw.Compatibility ?? 5),
+        Overall: Number(raw.Overall ?? 5),
+      };
+    });
+
+    this.confidence = {};
+    names.forEach(name => {
+      const raw = (src.confidence || {})[name];
+      if (raw && typeof raw === "object") {
+        this.confidence[name] = {
+          Appearance: Number(raw.Appearance ?? 0),
+          Personality: Number(raw.Personality ?? 0),
+          Compatibility: Number(raw.Compatibility ?? 0),
+        };
+      } else {
+        const n = Number(raw ?? 0);
+        this.confidence[name] = { Appearance: n, Personality: n, Compatibility: n };
+      }
+    });
+
+    this.comparisons = new Set((src.comparisons || []).map(c => {
+      if (typeof c === "string") return c;
+      if (Array.isArray(c) && c.length >= 2) return this.pair(String(c[0]), String(c[1]));
+      return null;
+    }).filter(Boolean));
+
+    const rw = src.weights || { ...DEFAULT_WEIGHTS };
+    const w = {
+      Appearance: Number(rw.Appearance ?? DEFAULT_WEIGHTS.Appearance),
+      Personality: Number(rw.Personality ?? DEFAULT_WEIGHTS.Personality),
+      Compatibility: Number(rw.Compatibility ?? DEFAULT_WEIGHTS.Compatibility),
+    };
+    const total = w.Appearance + w.Personality + w.Compatibility;
+    this.weights = total > 0
+      ? { Appearance: w.Appearance / total, Personality: w.Personality / total, Compatibility: w.Compatibility / total }
+      : { ...DEFAULT_WEIGHTS };
+
+    this.rankings = src.rankings || { Appearance: [], Personality: [], Compatibility: [] };
+    const rankingValid = DIMS.every(dim => Array.isArray(this.rankings[dim]) && this.rankings[dim].length);
+    if (!rankingValid && names.length) {
+      DIMS.forEach(dim => {
+        const sorted = names.slice().sort((a, b) => this.nodes[b][dim] - this.nodes[a][dim]);
+        const groups = [];
+        let last = null;
+        sorted.forEach(name => {
+          const score = this.nodes[name][dim];
+          if (last === null || Math.abs(last - score) > 1e-9) {
+            groups.push([name]);
+            last = score;
+          } else {
+            groups[groups.length - 1].push(name);
+          }
+        });
+        this.rankings[dim] = groups;
+      });
+    }
     this.rebalance();
   }
 }
@@ -207,7 +267,13 @@ function pushUndo(reason) {
   state.redo = [];
 }
 function applySnapshot(snapshot) { state.sys.fromJSON(JSON.parse(snapshot)); saveLocal(); render(); }
-function saveLocal() { localStorage.setItem("prs_state", JSON.stringify(state.sys.toJSON())); }
+function saveLocal() {
+  try {
+    localStorage.setItem("prs_state", JSON.stringify(state.sys.toJSON()));
+  } catch {
+    setStatus("Auto-save failed: local storage is full.");
+  }
+}
 function loadLocal() {
   const raw = localStorage.getItem("prs_state");
   if (!raw) return;
@@ -346,17 +412,48 @@ function exportCsv() {
 }
 
 function parseCsv(text) {
-  const lines = text.split(/\r?\n/).filter(Boolean);
-  if (lines.length < 2) return [];
-  const header = lines[0].split(",").map(x => x.replace(/^"|"$/g, ""));
-  const rows = [];
-  for (const line of lines.slice(1)) {
-    const parts = line.match(/("[^"]*"|[^,]+)/g) || [];
-    const obj = {};
-    header.forEach((h, i) => obj[h] = (parts[i] || "").replace(/^"|"$/g, ""));
-    rows.push(obj);
+  const table = [];
+  let cur = "";
+  let row = [];
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const next = text[i + 1];
+    if (ch === "\"" && inQuotes && next === "\"") {
+      cur += "\"";
+      i++;
+      continue;
+    }
+    if (ch === "\"") {
+      inQuotes = !inQuotes;
+      continue;
+    }
+    if (ch === "," && !inQuotes) {
+      row.push(cur);
+      cur = "";
+      continue;
+    }
+    if ((ch === "\n" || ch === "\r") && !inQuotes) {
+      if (ch === "\r" && next === "\n") i++;
+      row.push(cur);
+      if (row.some(v => v.trim() !== "")) table.push(row);
+      row = [];
+      cur = "";
+      continue;
+    }
+    cur += ch;
   }
-  return rows;
+  if (cur.length || row.length) {
+    row.push(cur);
+    if (row.some(v => v.trim() !== "")) table.push(row);
+  }
+  if (table.length < 2) return [];
+  const header = table[0].map(h => h.trim());
+  return table.slice(1).map(r => {
+    const obj = {};
+    header.forEach((h, i) => { obj[h] = (r[i] || "").trim(); });
+    return obj;
+  });
 }
 
 function importCsvRows(rows) {
@@ -399,6 +496,7 @@ document.getElementById("addBtn").addEventListener("click", async () => {
 });
 
 document.getElementById("manualBtn").addEventListener("click", async () => {
+  if (Object.keys(state.sys.nodes).length < 2) return alert("Add at least two people first.");
   const better = prompt("Who is better?");
   const worse = prompt("Who is worse?");
   if (!better || !worse) return;
@@ -413,6 +511,7 @@ document.getElementById("manualBtn").addEventListener("click", async () => {
 });
 
 document.getElementById("suggestBtn").addEventListener("click", async () => {
+  if (Object.keys(state.sys.nodes).length < 2) return alert("Add at least two people first.");
   const pair = state.sys.suggestComparison();
   if (!pair) return alert("No useful un-compared pairs left.");
   const [a, b] = pair;
@@ -424,6 +523,7 @@ document.getElementById("suggestBtn").addEventListener("click", async () => {
 });
 
 document.getElementById("reviewBtn").addEventListener("click", async () => {
+  if (Object.keys(state.sys.nodes).length < 2) return alert("Add at least two people first.");
   const top = state.sys.reviewPairs(1)[0];
   if (!top) return alert("Not enough people for review queue.");
   const a = top[1], b = top[2];
@@ -456,8 +556,13 @@ document.getElementById("loadInput").addEventListener("change", async (e) => {
   if (!f) return;
   const text = await f.text();
   pushUndo("load json");
-  state.sys.fromJSON(JSON.parse(text));
+  try {
+    state.sys.fromJSON(JSON.parse(text));
+  } catch {
+    alert("Invalid JSON file.");
+  }
   saveLocal(); render();
+  e.target.value = "";
 });
 
 document.getElementById("importCsvInput").addEventListener("change", async (e) => {
@@ -465,8 +570,14 @@ document.getElementById("importCsvInput").addEventListener("change", async (e) =
   if (!f) return;
   const text = await f.text();
   pushUndo("import csv");
-  importCsvRows(parseCsv(text));
+  const rows = parseCsv(text);
+  if (!rows.length) {
+    alert("CSV appears empty or invalid.");
+    return;
+  }
+  importCsvRows(rows);
   saveLocal(); render();
+  e.target.value = "";
 });
 
 el.search.addEventListener("input", render);
