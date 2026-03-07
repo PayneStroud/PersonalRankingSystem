@@ -1,6 +1,6 @@
 const DIMS = ["Appearance", "Personality", "Compatibility"];
 const DEFAULT_WEIGHTS = { Appearance: 0.25, Personality: 0.25, Compatibility: 0.5 };
-const BUILD_VERSION = "2026-03-06-3";
+const BUILD_VERSION = "2026-03-06-4";
 
 class RankingSystem {
   constructor() {
@@ -626,12 +626,10 @@ if (el.buildTag) el.buildTag.textContent = `Build ${BUILD_VERSION}`;
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
+    // Temporary: keep service worker disabled to avoid stale cache behavior on iPhone.
     try {
       const regs = await navigator.serviceWorker.getRegistrations();
       await Promise.all(regs.map(r => r.unregister()));
-    } catch {}
-    try {
-      await navigator.serviceWorker.register(`./sw.js?v=${BUILD_VERSION}`, { scope: "./" });
     } catch {}
   });
 }
