@@ -48,12 +48,12 @@ class RankingSystem {
     while (low < high) {
       const mid = Math.floor((low + high) / 2);
       const compareTo = ranking[mid][0];
-      const r = await askFn(`For ${dim}, is ${name} better than ${compareTo}?`, [name, compareTo, "Equal / Skip"]);
+      const r = await askFn(`For ${dim}, is ${name} better than ${compareTo}?`, ["Yes", "No", "Equal / Skip"]);
       if (!r) return;
-      if (r === name) {
+      if (r === "Yes") {
         this.recordComparison(name, compareTo, [dim], false);
         high = mid;
-      } else if (r === compareTo) {
+      } else if (r === "No") {
         this.recordComparison(name, compareTo, [dim], false);
         low = mid + 1;
       } else {
@@ -330,7 +330,7 @@ function render() {
     card.appendChild(sub);
 
     card.querySelector("[data-del]").addEventListener("click", async () => {
-      const choice = await askChoice("Delete person?", name, ["Delete", "Cancel"]);
+      const choice = await askChoice("Delete person?", name, ["Delete"]);
       if (choice !== "Delete") return;
       pushUndo("delete");
       state.sys.deleteNode(name);
@@ -343,24 +343,44 @@ function render() {
   setStatus(`Showing ${shown} people. Auto-saved locally.`);
 }
 
-function askChoice(title, subtitle = "", options = []) {
+function askChoice(title, subtitle = "", options = [], cancelLabel = "Cancel") {
   return new Promise(resolve => {
     el.choiceTitle.textContent = title;
     el.choiceSubtitle.textContent = subtitle;
     el.choiceButtons.innerHTML = "";
+    const opts = options.length ? options : ["OK"];
+    let resolved = false;
 
-    options.forEach(opt => {
+    const finish = (value) => {
+      if (resolved) return;
+      resolved = true;
+      resolve(value);
+    };
+
+    opts.forEach(opt => {
       const b = document.createElement("button");
       b.type = "button";
       b.textContent = opt;
       b.addEventListener("click", () => {
+        finish(opt);
         el.choiceDialog.close();
-        resolve(opt);
       });
       el.choiceButtons.appendChild(b);
     });
 
-    el.choiceDialog.onclose = () => resolve(null);
+    if (cancelLabel) {
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.className = "ghost";
+      cancel.textContent = cancelLabel;
+      cancel.addEventListener("click", () => {
+        finish(null);
+        el.choiceDialog.close();
+      });
+      el.choiceButtons.appendChild(cancel);
+    }
+
+    el.choiceDialog.onclose = () => finish(null);
     el.choiceDialog.showModal();
   });
 }
