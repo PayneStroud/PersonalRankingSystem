@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Personal Ranking</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="topbar card">
+      <h1>Personal Ranking</h1>
+      <p>Rank people by Appearance, Personality, and Compatibility.</p>
+    </header>
+
+    <section class="card controls">
+      <button id="addBtn" class="primary">+ Add Person</button>
+      <button id="manualBtn">Manual Compare</button>
+      <button id="suggestBtn">Suggested Compare</button>
+      <button id="reviewBtn">Review Queue</button>
+      <button id="undoBtn">Undo</button>
+      <button id="redoBtn">Redo</button>
+    </section>
+
+    <section class="card controls two-col">
+      <label>
+        Search
+        <input id="searchInput" type="text" placeholder="Type a name" />
+      </label>
+      <label>
+        Sort
+        <select id="sortSelect">
+          <option>Overall</option>
+          <option>Name</option>
+          <option>Appearance</option>
+          <option>Personality</option>
+          <option>Compatibility</option>
+          <option>Confidence</option>
+        </select>
+      </label>
+      <label>
+        Min Confidence <span id="confValue">0%</span>
+        <input id="confRange" type="range" min="0" max="100" value="0" />
+      </label>
+      <label>
+        Theme
+        <select id="themeSelect">
+          <option value="system">System</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </label>
+    </section>
+
+    <section class="card controls two-col">
+      <button id="saveBtn">Export JSON</button>
+      <label class="file-label">Import JSON<input id="loadInput" type="file" accept="application/json" /></label>
+      <button id="exportCsvBtn">Export CSV</button>
+      <label class="file-label">Import CSV<input id="importCsvInput" type="file" accept=".csv,text/csv" /></label>
+    </section>
+
+    <section id="list" class="list"></section>
+
+    <footer class="card status" id="status">Ready</footer>
+  </main>
+
+  <dialog id="choiceDialog" class="dialog">
+    <form method="dialog" class="dialog-content">
+      <h3 id="choiceTitle"></h3>
+      <p id="choiceSubtitle"></p>
+      <div id="choiceButtons" class="choice-buttons"></div>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
