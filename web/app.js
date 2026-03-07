@@ -345,8 +345,16 @@ function render() {
 
 function askChoice(title, subtitle = "", options = [], cancelLabel = "Cancel") {
   return new Promise(resolve => {
+    // Backward compatibility:
+    // allow askChoice(title, options) where subtitle is omitted.
+    if (Array.isArray(subtitle) && (!options || options.length === 0)) {
+      options = subtitle;
+      subtitle = "";
+    }
+    if (!Array.isArray(options)) options = [];
+
     el.choiceTitle.textContent = title;
-    el.choiceSubtitle.textContent = subtitle;
+    el.choiceSubtitle.textContent = subtitle || "";
     el.choiceButtons.innerHTML = "";
     const opts = options.length ? options : ["OK"];
     let resolved = false;
@@ -511,7 +519,7 @@ document.getElementById("addBtn").addEventListener("click", async () => {
   const name = prompt("Enter person name:");
   if (!name) return;
   pushUndo("add");
-  await state.sys.addNode(name, askChoice);
+  await state.sys.addNode(name, (question, options) => askChoice(question, "", options));
   saveLocal(); render();
 });
 
