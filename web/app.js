@@ -1,6 +1,6 @@
 const DIMS = ["Appearance", "Personality", "Compatibility"];
 const DEFAULT_WEIGHTS = { Appearance: 0.25, Personality: 0.25, Compatibility: 0.5 };
-const BUILD_VERSION = "2026-03-06-10";
+const BUILD_VERSION = "2026-03-06-11";
 
 class RankingSystem {
   constructor() {
@@ -65,24 +65,26 @@ class RankingSystem {
       const compareTo = ranking[mid][0];
       const r = await askFn(`For ${dim}, is ${name} better than ${compareTo}?`, ["Yes", "No", "Equal / Skip"]);
       if (r === "__cancel__") return false;
-      if (r === null || r === undefined) {
-        this.recordComparison(name, compareTo, [dim], false);
-        ranking[mid].push(name);
-        return true;
-      }
-      const choice = String(r).trim().toLowerCase();
-      if (choice === "yes" || choice === "y") {
+      if (r === null || r === undefined) return false;
+      const rawChoice = String(r).trim();
+      const choice = rawChoice.toLowerCase();
+      const tokens = choice.split(/[,\s/|]+/).filter(Boolean);
+      const saidYes = choice === "yes" || choice === "y" || choice === name.toLowerCase() || tokens.includes("yes") || tokens.includes(name.toLowerCase());
+      const saidNo = choice === "no" || choice === "n" || choice === compareTo.toLowerCase() || tokens.includes("no") || tokens.includes(compareTo.toLowerCase());
+      const saidEqual = choice === "equal / skip" || choice === "equal/skip" || choice === "equal" || choice === "skip" || tokens.includes("equal") || tokens.includes("skip");
+
+      if (saidYes && !saidNo) {
         this.recordComparison(name, compareTo, [dim], false);
         high = mid;
-      } else if (choice === "no" || choice === "n") {
+      } else if (saidNo && !saidYes) {
         this.recordComparison(name, compareTo, [dim], false);
         low = mid + 1;
-      } else if (choice === "equal / skip" || choice === "equal/skip" || choice === "equal" || choice === "skip") {
+      } else if (saidEqual || (saidYes && saidNo)) {
         this.recordComparison(name, compareTo, [dim], false);
         ranking[mid].push(name);
         return true;
       } else {
-        // Unknown string values should not abort add flow; treat as equal.
+        // Defensive fallback for stale/cached UIs: treat unknown as no-op tie, but do not cancel add.
         this.recordComparison(name, compareTo, [dim], false);
         ranking[mid].push(name);
         return true;
