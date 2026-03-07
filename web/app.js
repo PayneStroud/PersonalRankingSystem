@@ -1,6 +1,6 @@
 const DIMS = ["Appearance", "Personality", "Compatibility"];
 const DEFAULT_WEIGHTS = { Appearance: 0.25, Personality: 0.25, Compatibility: 0.5 };
-const BUILD_VERSION = "2026-03-06-8";
+const BUILD_VERSION = "2026-03-06-9";
 
 class RankingSystem {
   constructor() {
@@ -64,7 +64,12 @@ class RankingSystem {
       const mid = Math.floor((low + high) / 2);
       const compareTo = ranking[mid][0];
       const r = await askFn(`For ${dim}, is ${name} better than ${compareTo}?`, ["Yes", "No", "Equal / Skip"]);
-      if (r === null || r === undefined) return false;
+      if (r === "__cancel__") return false;
+      if (r === null || r === undefined) {
+        this.recordComparison(name, compareTo, [dim], false);
+        ranking[mid].push(name);
+        return true;
+      }
       const choice = String(r).trim().toLowerCase();
       if (choice === "yes" || choice === "y") {
         this.recordComparison(name, compareTo, [dim], false);
@@ -549,7 +554,10 @@ document.getElementById("addBtn").addEventListener("click", async () => {
   const name = prompt("Enter person name:");
   if (!name) return;
   const snapshot = JSON.stringify(state.sys.toJSON());
-  const created = await state.sys.addNode(name, (question, options) => askChoice(question, "", options));
+  const created = await state.sys.addNode(name, async (question, options) => {
+    const r = await askChoice(question, "", options);
+    return r === null ? "__cancel__" : r;
+  });
   if (!created) {
     applySnapshot(snapshot);
     return;
